@@ -4,6 +4,10 @@
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue) ![XGBoost](https://img.shields.io/badge/Model-XGBoost-orange) ![Streamlit](https://img.shields.io/badge/App-Streamlit-red) ![pandas](https://img.shields.io/badge/EDA-pandas%20%7C%20seaborn-green)
 
+**DemandLens** turns a lens on demand: it shows *why* demand moves, not just *how much* to expect.
+
+🔗 **Live demo:** [demandlens.streamlit.app](https://demandlens.streamlit.app) <!-- update once deployed on Streamlit Community Cloud -->
+
 ---
 
 ## TL;DR — Key Results
@@ -17,6 +21,73 @@
 | #1 demand driver | **Promotion** — 71% of model feature importance, **+30% average demand lift** |
 | Biggest risk factor | **Epidemic periods** — demand falls **38%** overall, up to **69%** for Toys |
 | Unmet demand | Demand exceeded units sold on **70% of records**, which is **~1.39M units (17.5% of total demand)** lost |
+
+---
+
+## 📸 App Preview
+
+<!-- Save the screenshot as screenshots/app_forecast.png -->
+
+![DemandLens forecast output](screenshots/app_forecast.png)
+
+*Set up a scenario (category, inventory, promotion, price, competitor price, discount) and DemandLens returns the predicted demand vs. average, the effective price, the promotion lift and a stock check.*
+
+---
+
+## 🏗️ Architecture: How DemandLens Works
+
+```mermaid
+flowchart TB
+    A[("demand_forecasting.csv<br/>76K store-product-day rows")]
+
+    subgraph EDA["① Analysis — DataExpo.ipynb"]
+        B["Data quality checks<br/>nulls · duplicates · types"]
+        C["Feature engineering<br/>calendar · discounted price · sell-through"]
+        D["Segment & time-series analysis<br/>category · promotion · season · weather · epidemic"]
+        B --> C --> D
+    end
+
+    subgraph ML["② Modeling — ML.ipynb"]
+        E["Feature selection<br/>6 pre-period inputs<br/>Units Sold excluded to avoid leakage"]
+        F["LabelEncoder on Category"]
+        G["80/20 train-test split"]
+        H["XGBoost + RandomizedSearchCV<br/>25 configs × 3-fold CV"]
+        I["Evaluation<br/>RMSE 35.8 vs 47.0 baseline<br/>feature importance"]
+        E --> F --> G --> H --> I
+    end
+
+    subgraph ART["③ Saved artifacts"]
+        J["xgboost_demand_model.json"]
+        K["lable_encoders.pkl"]
+    end
+
+    subgraph APP["④ DemandLens app — app.py"]
+        L["User scenario inputs"]
+        M["Encode Category"]
+        N["Predict demand<br/>with and without promotion"]
+        O["Forecast vs average · effective price<br/>promotion lift · stock check"]
+        L --> M --> N --> O
+    end
+
+    P{{"Business decisions<br/>promotion & discount planning<br/>replenishment · disruption playbooks"}}
+
+    A --> B
+    A --> E
+    I --> J
+    F --> K
+    J --> N
+    K --> M
+    D -- "insights" --> P
+    O -- "what-if forecasts" --> P
+```
+
+**How it fits together**
+
+1. **Analysis:** the raw data is checked for quality, enriched with calendar, price and inventory KPIs, then sliced by segment and over time. This produces the insights in [section 5](#5-analytical-insights).
+2. **Modeling:** six inputs a planner knows *before* the selling period are encoded and used to train a tuned XGBoost regressor, which is then compared against a naive baseline.
+3. **Artifacts:** the trained model and the category encoder are saved so that the app uses exactly the same mapping as training.
+4. **App:** DemandLens loads the artifacts once, encodes the user's scenario, and predicts demand twice (with and without a promotion) so it can report the lift and check stock coverage.
+5. **Decisions:** the EDA insights and the what-if forecasts both feed promotion, pricing, inventory and risk decisions.
 
 ---
 
@@ -53,6 +124,8 @@ This project answers three questions:
 ├── DataExpo.ipynb             # Data exploration: data quality, feature engineering, segment and time-series analysis
 ├── ML.ipynb                   # Feature selection, encoding, hyperparameter tuning, evaluation, export
 ├── app.py                     # DemandLens Streamlit "what-if" demand prediction app
+├── requirements.txt           # Runtime dependencies for the app (used by Streamlit Community Cloud)
+├── screenshots/               # App and chart screenshots used in this README
 ├── demand_forecasting.csv     # Raw dataset
 ├── xgboost_demand_model.json  # Trained model (native XGBoost format, portable across versions)
 └── lable_encoders.pkl         # Fitted LabelEncoder(s) for categorical inputs
@@ -113,7 +186,7 @@ The tuned model reduces error by about **24%** compared with the baseline, using
 - the **promotion lift** for that exact scenario (the model is run with and without a promotion);
 - a **stock check** that warns when expected demand exceeds the inventory on hand.
 
-In the app, the model is cached with `@st.cache_resource` and saved in XGBoost's native JSON format, so it doesn't break when library versions change.
+In the app, the model is cached with `@st.cache_resource` and saved in XGBoost's native JSON format, so it doesn't break when library versions change. The app is deployed for free on **Streamlit Community Cloud** straight from this repository.
 
 ---
 
@@ -209,12 +282,26 @@ A senior review of the current approach, listing what I would change before prod
 
 ## 9. How to Run
 
+**Run the DemandLens app locally**
+
 ```bash
-pip install pandas numpy scikit-learn xgboost streamlit matplotlib seaborn lightgbm
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
-To reproduce the analysis, open `DataExpo.ipynb` (EDA), then `ML.ipynb` (training).
+**Reproduce the analysis**
+
+```bash
+pip install -r requirements.txt numpy matplotlib seaborn lightgbm jupyter
+```
+
+Open `DataExpo.ipynb` (EDA), then `ML.ipynb` (training). `ML.ipynb` exports `xgboost_demand_model.json` and `lable_encoders.pkl`, which the app loads.
+
+**Deploy your own copy (free)**
+
+1. Fork this repo.
+2. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub and click **Create app**.
+3. Select the repo, branch `main` and main file `app.py`, then choose Python 3.12 under **Advanced settings**.
 
 ---
 
