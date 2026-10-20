@@ -1,4 +1,4 @@
-# Retail Demand Forecasting — Drivers, Model & Decision App
+# 📈 DemandLens — Retail Demand Forecasting & Promotion Analytics
 
 > An end-to-end analytics project that quantifies **what drives retail demand** (promotions, discounts, seasonality, weather, disruption events) across 5 stores, 20 products and 5 categories, then puts a tuned **XGBoost** demand model behind a **Streamlit** app so that non-technical teams can run "what-if" scenarios.
 
@@ -52,7 +52,7 @@ This project answers three questions:
 ```
 ├── DataExpo.ipynb             # Data exploration: data quality, feature engineering, segment and time-series analysis
 ├── ML.ipynb                   # Feature selection, encoding, hyperparameter tuning, evaluation, export
-├── app.py                     # Streamlit "what-if" demand prediction app
+├── app.py                     # DemandLens Streamlit "what-if" demand prediction app
 ├── demand_forecasting.csv     # Raw dataset
 ├── xgboost_demand_model.json  # Trained model (native XGBoost format, portable across versions)
 └── lable_encoders.pkl         # Fitted LabelEncoder(s) for categorical inputs
@@ -107,7 +107,13 @@ The tuned model reduces error by about **24%** compared with the baseline, using
 | Inventory Level | 1.1% |
 
 ### 4.6 Deployment
-`app.py` is a Streamlit app. A user enters price, discount, inventory, promotion flag, competitor price and category, and gets an instant demand estimate. The model is cached with `@st.cache_resource` and saved in XGBoost's native JSON format, so it doesn't break when library versions change.
+`app.py` is the **DemandLens** Streamlit app. A user sets up a scenario (category, inventory, promotion on/off, price, competitor price, discount) and gets:
+- the **predicted demand**, benchmarked against the average demand in the data;
+- the **effective price** after the discount;
+- the **promotion lift** for that exact scenario (the model is run with and without a promotion);
+- a **stock check** that warns when expected demand exceeds the inventory on hand.
+
+In the app, the model is cached with `@st.cache_resource` and saved in XGBoost's native JSON format, so it doesn't break when library versions change.
 
 ---
 
@@ -232,6 +238,6 @@ To reproduce the analysis, open `DataExpo.ipynb` (EDA), then `ML.ipynb` (trainin
 
 ### Resume bullets
 
-- *Built an XGBoost demand-forecasting model on 76K retail transactions (5 stores, 20 SKUs) that reduced forecast error by 24% vs. baseline, and deployed it as a Streamlit what-if tool for planners.*
+- *Built an XGBoost demand-forecasting model on 76K retail transactions (5 stores, 20 SKUs) that reduced forecast error by 24% vs. baseline, and deployed it as **DemandLens**, a Streamlit what-if tool that shows predicted demand, promotion lift and stock-out risk for planners.*
 - *Quantified a +30% promotional demand lift and found a 15% discount saturation point, showing that 20–25% discounts gave away margin without adding volume.*
 - *Measured category-level disruption sensitivity (Toys −69%, Clothing +1% during epidemic periods) and ~17.5% unmet demand, which became recommendations for category-specific risk playbooks and inventory reallocation.*
