@@ -6,7 +6,7 @@
 
 **DemandLens** turns a lens on demand: it shows *why* demand moves, not just *how much* to expect.
 
-🔗 **Live demo:** [demandlens.streamlit.app]([https://demandlens.streamlit.app](https://mohitarmore-demand-forecasting-model--app-agqcyx.streamlit.app/)) <!-- update once deployed on Streamlit Community Cloud -->
+🔗 **Live demo:** (https://mohitarmore-demand-forecasting-model--app-agqcyx.streamlit.app/) <!-- update once deployed on Streamlit Community Cloud -->
 
 ---
 
