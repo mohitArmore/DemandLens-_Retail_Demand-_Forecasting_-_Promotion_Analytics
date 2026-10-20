@@ -27,8 +27,9 @@
 ## 📸 App Preview
 
 <!-- Save the screenshot as screenshots/app_forecast.png -->
+<img width="1892" height="946" alt="Screenshot 2026-10-20 170755" src="https://github.com/user-attachments/assets/2de39622-2b85-485a-8413-3ac98492d1bb" />
 
-![DemandLens forecast output](screenshots/app_forecast.png)
+
 
 *Set up a scenario (category, inventory, promotion, price, competitor price, discount) and DemandLens returns the predicted demand vs. average, the effective price, the promotion lift and a stock check.*
 
