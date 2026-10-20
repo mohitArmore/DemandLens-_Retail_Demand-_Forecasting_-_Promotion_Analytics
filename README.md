@@ -6,7 +6,7 @@
 
 **DemandLens** turns a lens on demand: it shows *why* demand moves, not just *how much* to expect.
 
-🔗 **Live demo:** [demandlens.streamlit.app](https://demandlens.streamlit.app) <!-- update once deployed on Streamlit Community Cloud -->
+🔗 **Live demo:** [Open DemandLens on Streamlit Cloud](https://mohitarmore-demand-forecasting-model--app-agqcyx.streamlit.app/)
 
 ---
 
@@ -17,8 +17,8 @@
 | Dataset | **76,000** store-product-day records, Jan 2022 – Jan 2024 (760 days) |
 | Scope | 5 stores · 20 products · 5 categories · 4 regions |
 | Model | XGBoost regressor, tuned with `RandomizedSearchCV` (25 configs × 3-fold CV = 75 fits) |
-| Test RMSE | **35.8 units** vs. **47.0** for a naive "predict the average" baseline → **~24% lower error** |
-| #1 demand driver | **Promotion** — 71% of model feature importance, **+30% average demand lift** |
+| Test accuracy | **RMSE 35.5 · MAE 27.0 · R² 0.43**, vs. RMSE 47.0 / MAE 37.0 for a naive "predict the average" baseline → **24% lower RMSE, 27% lower MAE** |
+| #1 demand driver | **Promotion** — 61% of model feature importance, **+30% average demand lift** |
 | Biggest risk factor | **Epidemic periods** — demand falls **38%** overall, up to **69%** for Toys |
 | Unmet demand | Demand exceeded units sold on **70% of records**, which is **~1.39M units (17.5% of total demand)** lost |
 
@@ -52,7 +52,7 @@ flowchart TB
         F["LabelEncoder on Category"]
         G["80/20 train-test split"]
         H["XGBoost + RandomizedSearchCV<br/>25 configs × 3-fold CV"]
-        I["Evaluation<br/>RMSE 35.8 vs 47.0 baseline<br/>feature importance"]
+        I["Evaluation<br/>RMSE 35.5 · MAE 27.0 · R² 0.43<br/>vs. mean baseline<br/>feature importance"]
         E --> F --> G --> H --> I
     end
 
@@ -105,7 +105,11 @@ This project answers three questions:
 
 ## 2. Dataset
 
+**Source:** [Demand Forecasting Dataset on Kaggle](https://www.kaggle.com/datasets/raminhuseyn/demand-forecasting-dataset) by Ramin Huseyn (CC0: Public Domain).
+
 `demand_forecasting.csv`: 76,000 rows × 16 columns, with **no nulls and no duplicates** (checked in EDA).
+
+> **Note:** the dataset is **simulated** retail data published for educational use, so the findings show the analytical approach rather than the behavior of a real company. The same pipeline can be applied unchanged to real point-of-sale data.
 
 | Group | Columns |
 |---|---|
@@ -156,28 +160,30 @@ This project answers three questions:
 - **Features:** `Price`, `Discount`, `Inventory Level`, `Promotion`, `Competitor Pricing`, `Category`. These are the levers a planner controls or knows *before* the selling period.
 - **Leakage control:** `Units Sold` correlates **0.83** with Demand, but it is only known *after* the fact. It was deliberately excluded so that the model can actually be used for forecasting.
 - **Encoding:** `LabelEncoder` on `Category`. Ordinal codes are fine for tree models, and no scaling is needed.
-- **Split:** 80/20 train/test.
+- **Split:** 80/20 train/test with a fixed `random_state` so results can be reproduced.
 - **Tuning:** `RandomizedSearchCV` over `n_estimators`, `max_depth`, `learning_rate`, `subsample`, `colsample_bytree` and `min_child_weight`, optimizing MAE.
-- **Best configuration:** `n_estimators=500, max_depth=8, learning_rate=0.01, subsample=0.8, colsample_bytree=1, min_child_weight=3`. This is a slow-learning, deep ensemble that captures interactions such as Promotion × Category.
+- **Best configuration:** `n_estimators=200, max_depth=8, learning_rate=0.05, subsample=0.8, colsample_bytree=1, min_child_weight=5`. Deep trees capture interactions such as Promotion × Category, and row subsampling plus a higher `min_child_weight` keep them from overfitting.
 
 ### 4.5 Evaluation
-| Model | RMSE (units) |
-|---|---|
-| Naive baseline (predict mean demand) | 47.0 |
-| **Tuned XGBoost** | **35.8** |
+| Model | RMSE (units) | MAE (units) | R² |
+|---|---|---|---|
+| Naive baseline (predict mean demand) | 47.0 | 37.0 | 0.00 |
+| **Tuned XGBoost** | **35.5** | **27.0** | **0.43** |
 
-The tuned model reduces error by about **24%** compared with the baseline, using only six pre-period inputs.
+Using only six inputs known before the selling period, the tuned model is off by about **27 units on average** and reduces error by **24% (RMSE) and 27% (MAE)** compared with the baseline.
+
+An R² of 0.43 means the model explains a bit under half of the variation in demand. That's expected, because strong drivers found in the EDA (epidemic periods, weather, season) aren't model inputs yet. Adding them is a key next step (see [Limitations and Next Steps](#8-limitations-and-next-steps)).
 
 **Feature importance (gain-based):**
 
 | Feature | Importance |
 |---|---|
-| Promotion | **71.1%** |
-| Category | 20.1% |
-| Price | 5.0% |
-| Competitor Pricing | 1.4% |
-| Discount | 1.2% |
-| Inventory Level | 1.1% |
+| Promotion | **60.7%** |
+| Category | 26.0% |
+| Price | 7.0% |
+| Competitor Pricing | 2.4% |
+| Discount | 2.0% |
+| Inventory Level | 1.9% |
 
 ### 4.6 Deployment
 `app.py` is the **DemandLens** Streamlit app. A user sets up a scenario (category, inventory, promotion on/off, price, competitor price, discount) and gets:
@@ -195,7 +201,8 @@ In the app, the model is cached with `@st.cache_resource` and saved in XGBoost's
 ### 5.1 Promotions are the strongest lever
 - Average demand is **95 without a promotion** and **123 with one**, a **+30% lift**.
 - The lift holds in every category: Clothing +29%, Groceries +29%, Toys +30%, Furniture +30%, Electronics +31%.
-- **Implication:** promotion calendars should be planned together with replenishment. A promotion without matching stock turns into a stock-out.
+- **Timing matters through stacking, not a bigger lift:** the lift stays around +30% in every month (22–36%), but it adds on top of seasonal peaks. A promotion in a peak month gives the highest demand of the year: **142 in August and 140 in June**, compared with 81 for May with no promotion. Clothing reaches its highest level (**142**) when promoted during the Nov–Jan holiday period.
+- **Implication:** promotion calendars should be planned together with replenishment. A promotion in a peak month needs the most extra stock, and a promotion without matching stock turns into a stock-out.
 
 ### 5.2 Discounts work as a threshold, not a slope
 | Discount | 0% | 5% | 10% | 15% | 20% | 25% |
@@ -272,9 +279,8 @@ A senior review of the current approach, listing what I would change before prod
 | **Random train/test split on time-ordered data** can leak future patterns into training | Use time-based validation (train on 2022, test on 2023) with `TimeSeriesSplit` |
 | **Strong drivers left out of the model**: Epidemic (−38%), Weather (±23%), Seasonality, Region | Add them as features. EDA suggests they would cut RMSE substantially |
 | **No temporal memory** | Add lag and rolling features (demand 7, 14 and 28 days ago, rolling means) and product/store IDs |
-| Only RMSE reported | Also report MAE, MAPE/WAPE and bias, the measures planners actually use |
-| Unseeded split | Set `random_state` so results are reproducible |
-| One global model | Compare per-category models and LightGBM (already imported), and add SHAP for driver explanations |
+| No percentage-error or bias metrics | Add WAPE and forecast bias, the measures planners actually use |
+| One global model | Compare per-category models and other algorithms (LightGBM, Random Forest), and add SHAP for driver explanations |
 | Point forecasts only | Quantile regression to produce prediction intervals for safety stock |
 | 2024 has only January data | Don't read the lower 2024 average (98 vs. 106 in 2022) as a trend, because it reflects a winter-only sample |
 
@@ -292,7 +298,7 @@ streamlit run app.py
 **Reproduce the analysis**
 
 ```bash
-pip install -r requirements.txt numpy matplotlib seaborn lightgbm jupyter
+pip install -r requirements.txt numpy matplotlib seaborn jupyter
 ```
 
 Open `DataExpo.ipynb` (EDA), then `ML.ipynb` (training). `ML.ipynb` exports `xgboost_demand_model.json` and `lable_encoders.pkl`, which the app loads.
@@ -325,6 +331,6 @@ Open `DataExpo.ipynb` (EDA), then `ML.ipynb` (training). `ML.ipynb` exports `xgb
 
 ### Resume bullets
 
-- *Built an XGBoost demand-forecasting model on 76K retail transactions (5 stores, 20 SKUs) that reduced forecast error by 24% vs. baseline, and deployed it as **DemandLens**, a Streamlit what-if tool that shows predicted demand, promotion lift and stock-out risk for planners.*
+- *Built an XGBoost demand-forecasting model on 76K store-product-day retail records (5 stores, 20 products) that reduced forecast error by 24% vs. baseline, and deployed it as **DemandLens**, a Streamlit what-if tool that shows predicted demand, promotion lift and stock-out risk for planners.*
 - *Quantified a +30% promotional demand lift and found a 15% discount saturation point, showing that 20–25% discounts gave away margin without adding volume.*
 - *Measured category-level disruption sensitivity (Toys −69%, Clothing +1% during epidemic periods) and ~17.5% unmet demand, which became recommendations for category-specific risk playbooks and inventory reallocation.*
